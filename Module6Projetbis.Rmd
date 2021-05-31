@@ -42,6 +42,8 @@ options(scipen = 12) ## Max number of digits for non-scientific notation
 # knitr::asis_output("\\footnotesize")
 ```
 
+J'importe les librairies
+
 ```{r libraries, echo=FALSE, eval=TRUE}
 #### Required libraries ####
 
@@ -63,13 +65,6 @@ kable(as.data.frame(c(required_cranLib)),
       col.names = "libraries",
       caption = "Loaded required libraries"
     )
-
-```
-
-Répertoire de travail:
-
-```{r function_download_only_once, eval=TRUE}
-getwd()
 
 ```
 
@@ -131,7 +126,7 @@ Vos travaux doivent être reproductibles, pensez à décrire et justifier les di
 
 # Import données
 
-Nous téléchargeons les quatre fichiers dans un dossier local `~/Module6Projet`, et les chargeons dans les data.frames suivants: 
+Je télécharge les quatre fichiers dans un dossier local `~/Module6Projet`, et les charge dans les data.frames suivants: 
 
 - Données brutes de transcriptome: `fa_expr`
 - Métadonnées transcriptome: `fa_meta`
@@ -178,7 +173,6 @@ downloadOnlyOnce <- function(url_base,
 }
 ```
 
-We can now use our new function `downloadOnlyOnce()` to download the files from the folic acid dataset and store them in a local folder. We will download successively :
 
 ```{r download_fa, eval=TRUE}
 ## Specify the basic parameters
@@ -233,11 +227,7 @@ prot_metadata_file <- downloadOnlyOnce(
 
 ```
 
-After having run the chunk of code above, try to re-run it. In principle, you should just receive messages telling you that the files are already there. 
-
 ## Loading the files
-
-We now write a function `load_fix_row_names()` that loads a data file and takes a specified column as row names, whilst automatically fixing potential problems due to duplicate labels in this column. 
 
 ```{r my_easy_load_function, eval=TRUE}
 #' @title Load a tab-separated value file and manually set row ames after having forced them to unique values
@@ -261,7 +251,6 @@ load_fix_row_names <- function(file,
 
 ```
 
-We can now load the data that from our local folder. 
 
 ```{r load_fa, out.width="80%", eval=TRUE}
 
@@ -298,7 +287,7 @@ kable(pfa_meta, caption = "Metadata for the proteome dataset pfa")
 
 ```
 
-Nous regardons la structure de chaque dataframe.
+Structure de chaque dataframe.
 
 ```{r insepct data, eval=TRUE}
 str(fa_expr)
@@ -308,7 +297,8 @@ str(pfa_expr)
 str(pfa_expr_norm)
 str(pfa_meta)
 ```
-Je supprime le groupe day3 du fichier metadata pfa
+
+Je supprime le groupe day3 du fichier metadata pfa 
 
 ```{r delete day3, eval=TRUE}
 
@@ -323,7 +313,7 @@ fa_meta$sampleName == names(fa_expr)
 
 ```
 
-Nous les réorganisons les échantillons dans l'ordre de l'expérience: condition normale, puis day 1 à 14 avec les 3 réplicats.
+Donc je réorganise les échantillons dans l'ordre de l'expérience: condition normale, puis day 1 à 14 avec les 3 réplicats.
 
 ```{r reoder data, eval=TRUE}
 sample_order <- c(paste(rep(c("normal", "day1", "day2", "day3", "day7", "day14"), each = 3),
@@ -370,7 +360,7 @@ pfa_meta
 library("DESeq2")
 ```
 
-Préparation objet DESeq2
+Préparation objet **DESeq2**
 
 ```{r 2, eval=TRUE}
 
@@ -392,37 +382,39 @@ Run fonction DESeq2
 dds <- DESeq(dds)
 ```
 
-Table de résultats du DESeq2 entre les groupes "normal" et "day7"
+Table de résultats du DESeq2 entre les groupes **normal** et **day7**
 
 ```{r 4, eval=TRUE}
 res <- results(dds, contrast=c("condition", "normal", "day7"))
 head(res)
 ```
 
-Combien de gènes sont significatifs > 0.05
+Combien de gènes sont **significatifs > 0.05**
 
 ```{r 5, eval=TRUE}
 table(res$padj < 0.05)
 ```
 
-Je classe la table par ordre décroissant de padj
+Je classe la table par **ordre décroissant de padj**
 
 ```{r 6, eval=TRUE}
 orderedRes <- res[ order(res$padj), ]
 head(orderedRes)
 ```
 
-Je normalise la table
+Je **normalise** la table
 
 ```{r 7, eval=TRUE}
 normCounts <- counts(dds, normalized = TRUE)
 head(normCounts)
 ```
-Visualisation des estimations de dispersion de DESeq2
+
+Visualisation des **estimations de dispersion** de DESeq2
 
 ```{r 8, eval=TRUE}
 plotDispEsts(dds)
 ```
+
 - Les points noirs sont la représentation "brute" des gènes (forte variabilité)
 
 - La ligne de tendance rouge (dépendance des dispersions à la moyenne)
@@ -431,12 +423,13 @@ plotDispEsts(dds)
 
 - Les cercles bleus au-dessus du «nuage» principal représentent des gènes avec des valeurs aberrantes de dispersion.
 
-Distribution des pvalues
+Distribution des **pvalues**
 
 ```{r 9, eval=TRUE}
 hist(orderedRes$pvalue, breaks=0:50/50, xlab="p value", main="Histogram of nominal p values")
 ```
-Heatmap des 20 gènes les plus différentiellement exprimés. 
+
+Heatmap des **20 gènes les plus différentiellement exprimés**. 
 
 ```{r 10, eval=TRUE}
 library(pheatmap)
@@ -487,44 +480,46 @@ Run fonction DESeq2
 dds <- DESeq(dds)
 ```
 
-Table de résultats du DESeq2 entre les groupes "normal" et "day7"
+Table de résultats du DESeq2 entre les groupes **normal** et **day7**
 
 ```{r 13 , eval=TRUE}
 res <- results(dds, contrast=c("condition", "normal", "day7"))
 head(res)
 ```
 
-Combien de gènes sont significatifs > 0.05
+Combien de gènes sont **significatifs > 0.05**
 
 ```{r 14, eval=TRUE}
 table(res$padj < 0.05)
 ```
 
-Je classe la table par ordre décroissant de padj
+Je classe la table par **ordre décroissant de padj**
 
 ```{r 15, eval=TRUE}
 orderedRes <- res[ order(res$padj), ]
 head(orderedRes)
 ```
 
-Je normalise la table
+Je **normalise** la table
 
 ```{r 16, eval=TRUE}
 normCounts <- counts(dds, normalized = TRUE)
 head(normCounts)
 ```
-Visualisation des estimations de dispersion de DESeq2
+
+Visualisation des **estimations de dispersion** de DESeq2
 
 ```{r 17, eval=TRUE}
 plotDispEsts(dds)
 ```
 
-Distribution des pvalues
+Distribution des **pvalues**
 
 ```{r 18, eval=TRUE}
 hist(orderedRes$pvalue, breaks=0:50/50, xlab="p value", main="Histogram of nominal p values")
 ```
-Heatmap des 20 gènes les plus différentiellement exprimés. 
+
+Heatmap des **20 gènes les plus différentiellement exprimés**. 
 
 ```{r 19, eval=TRUE}
 
@@ -557,7 +552,6 @@ pheatmap(values,
 Il y a 18 échantillons pour l'expérience fa et 10 pour l'expérience pfa, il faut donc supprimer les 6 échantillons supplémentaire de la table fa.
 
 Il faut également uniformiser la table metadata en conséquence.
-
 
 ```{r 20 ,eval=TRUE}
 
@@ -598,9 +592,10 @@ rownames(metadata)
 colnames(fa)
 colnames(pfa)
 ```
+
 ## Filtres 
 
-Je regarde combien il y a de lignes avec des zéros dans la table fa et je les supprime et je filtre les genes où il y a moins de 3 échantillons avec des counts supérieurs ou égaux à 5
+Je regarde combien il y a de lignes avec des zéros dans la table fa et je les supprime et je filtre les genes où il y au moins de 3 échantillons avec des counts supérieurs ou égaux à 5
 
 ```{r 22, eval=TRUE}
 dim(fa)
@@ -688,8 +683,6 @@ plotIndiv(spca.pfa_t, group = metadata$condition, comp= c(1,2), ind.names = FALS
 plotVar(spca.fa_t, var.names = FALSE, comp= c(1,2),title = "PlotVar PC1 & PC2 fa")
 plotVar(spca.pfa_t, var.names = FALSE, comp= c(1,2),title = "PlotVar PC1 & PC2 pfa")
 
-
-
 ```
 
 ### PLS-DA
@@ -712,7 +705,6 @@ mixOmics::plotLoadings(plsda.fa_t, comp=2, contrib = "max")
 mixOmics::plotLoadings(plsda.pfa_t, comp=1, contrib = "max")
 mixOmics::plotLoadings(plsda.pfa_t, comp=2, contrib = "max")
 
-
 ```
 
 ### Sparse PLS-DA
@@ -732,7 +724,6 @@ plotLoadings(splsda.fa_t, comp=2, contrib = 'max')
 plotLoadings(splsda.pfa_t, comp=1, contrib = 'max')
 plotLoadings(splsda.pfa_t, comp=2, contrib = 'max')
 
-
 ```
 
 ## Analyses multi omics 
@@ -742,7 +733,6 @@ plotLoadings(splsda.pfa_t, comp=2, contrib = 'max')
 ```{r pls, eval= TRUE}
 
 pls.fa.pfa <- pls(fa_t,pfa_t) 
-#liver.pls <- pls(X, Y, ncomp = 10, mode = "regression")
 
 plotIndiv(pls.fa.pfa,rep.space="XY-variate",
           title = "plotIndiv PLS",
@@ -790,11 +780,6 @@ plotVar(block.plsda.fa.pfa, var.names = c(FALSE, FALSE))
 
 ### Multi-block S-PLS-DA / DIABLO
 
-La conception de la matrice détermine quels blocs doivent être connectés pour maximiser la corrélation ou la covariance entre les composants. les valeurs peuvent être comprises entre 0 (pas de corrélation) et 1 (corrélation pour maximiser) et est une matrice symétrique. La conception peut être choisie sur la base de connaissances préalables (`` je m'attends à ce que l'ARNm et le miARN soient fortement corrélés '') ou basée sur les données (par exemple sur la base d'une analyse préalable, telle qu'une analyse non parcimonieuse avec block.pls pour examiner la corrélation entre les différents blocs via les composants modélisés).
-Notre expérience a montré qu'un compromis entre maximiser la corrélation entre les blocs et discriminer le résultat devait être atteint, et que le poids dans la matrice de conception pouvait être réglé à <1 entre les blocs (voir un exemple dans notre vignette et des informations en supplément. matériau dans [4]).
-
-Ici, nous choisissons une conception où tous les blocs sont connectés avec un lien de 0,1 (voir Informations supplémentaires S3). Nous fixons le nombre de composants à K-1, où K est le nombre de catégories dans le résultat Y. 
-
 ```{r data, eval= TRUE}
 data <- list(Genes = fa_t,
            Proteins = pfa_t)
@@ -818,8 +803,7 @@ design
 Tout d'abord, nous ajustons un modèle DIABLO sans sélection de variable pour évaluer la performance globale et choisir le nombre de composants pour le modèle DIABLO final. La fonction perf est exécutée avec une validation croisée 10 fois répétée 10 fois. 
 
 ```{r perf diablo, eval= TRUE}
-sgccda.res = block.splsda(X = data, Y = Y, ncomp = 3, 
-                           design = design)
+sgccda.res = block.splsda(X = data, Y = Y, ncomp = 10, design = design)
 
 #set.seed(123) # for reproducibility, only when the `cpus' argument is not used
 # this code takes a couple of min to run
@@ -828,8 +812,6 @@ sgccda.res = block.splsda(X = data, Y = Y, ncomp = 3,
 #perf.diablo  # lists the different outputs
 #plot(perf.diablo) 
 ```
-
-À partir du graphique de performance ci-dessus, nous observons que le taux d'erreur global et équilibré (BER) diminue de 1 à 2 composants. L'écart type indique un léger gain potentiel lors de l'ajout de composants supplémentaires. La distance centroids.dist semble donner la meilleure précision (voir Matériel supplémentaire dans [6]). Compte tenu de cette distance et du BER, la sortie $ choice.ncomp indique un nombre optimal de composants pour le modèle DIABLO final. 
 
 ```{r  choice,eval=TRUE}
 #perf.diablo$choice.ncomp$WeightedVote
@@ -840,17 +822,11 @@ sgccda.res = block.splsda(X = data, Y = Y, ncomp = 3,
 #ncomp
 ```
 
+Le nombre de composantes à garder est de 4
+
 #### Tuning keepX
 
-Nous choisissons le nombre optimal de variables à sélectionner dans chaque ensemble de données à l'aide de la fonction tune.block.splsda, à laquelle nous fournissons une grille de valeurs keepX pour chaque type d'omique. Notez que la fonction a été paramétrée pour favoriser la signature small-ish tout en permettant d'obtenir un nombre suffisant de variables pour la validation / interprétation en aval.
-
-Le réglage de la fonction est exécuté avec une validation croisée de 10 fois, mais répété une seule fois. Notez que pour un processus de réglage plus approfondi, avec un temps de calcul suffisant, nous pourrions augmenter l'argument nrepeat.
-
-
-keep.X force le nombre de variables à conserver sur chaque composante pour chaque jeu de donnée.
-Comme c'est pas facile de savoir quoi mettre, la fonction de tuning permet de tester des combinaisons de valeurs et de choisir la "meilleure" (au sens celle qui réalise la plus petite erreur de prédiction).
-Dans un souci d'interprétabilité, il faudrait peu de variables par composante mais dans un souci d'ajustement aux données, il faudrait plein de variables par composantes.
-Le tuning permet de faire un compromis automatique entre ces deux objectifs.
+Je choisis le nombre optimal de variables à sélectionner dans chaque ensemble de données à l'aide de la fonction tune.block.splsda.
 
 ```{r  test keepx,eval=TRUE}
 # #set.seed(123) # for reproducibility, only when the `cpus' argument is not used
@@ -880,15 +856,14 @@ sgccda.res = block.splsda(X = data, Y = Y, ncomp = 4,
                           keepX = list.keepX, design = design)
 ```
 
-plotDIABLO est un tracé de diagnostic pour vérifier si la corrélation entre les composants de chaque ensemble de données a été maximisée comme spécifié dans la matrice de conception. Nous spécifions la dimension à évaluer avec l'argument ncomp. 
+plotDIABLO est un tracé de diagnostic pour vérifier si la corrélation entre les composants de chaque ensemble de données a été maximisée comme spécifié dans la matrice de conception. 
 
 ```{r  diablo,eval=TRUE}
-plotDiablo(sgccda.res, ncomp = 1)
+plotDiablo(sgccda.res, ncomp = 4)
 plotIndiv(sgccda.res, ind.names = FALSE, legend = TRUE, title = 'DIABLO')
 plotArrow(sgccda.res, ind.names = FALSE, legend = TRUE, title = 'DIABLO')
 
 ```
-
 #### Variable plots
 
 ```{r  plotvar,eval=TRUE}
@@ -910,17 +885,6 @@ Then apply the first part of the network reconstruction steps as we saw them on 
 
 Instead of using WGCNA’s module prediction routines, apply a universal threshold of 0.5 on the adjacency matrix, and obtain an adjacency matrix that is reduced in size. This is the network.
 
-
-Reconstruisez le réseau de co-expression à partir de tous les points temporels des données transcriptomiques FA. Proposer de filtrer et de supprimer tous les gènes exprimés par zéro, les NA et les gènes les moins informatifs des données transcriptomiques. (Je supprime tous les gènes qui ne sont pas exprimés dans au moins 9 des 18 conditions (expression> 1 TPM dans 9) puis filtre avec le coefficient de variation> 0,75).
-
-Appliquez ensuite la première partie des étapes de reconstruction du réseau telles que nous les avons vues sur le cours WGCNA jusqu'aux prédictions du module.
-
-Au lieu d'utiliser les routines de prédiction de module de WGCNA, appliquez un seuil universel de 0,5 sur la matrice de contiguïté et obtenez une matrice de contiguïté de taille réduite. C'est le réseau. 
-
- j'ai mis comme trait le jour post-injection. Du coup tu calcules la corrélation entre MEs et traits avec la fonction cor() sur la matrice (individus, MEs modules) et ta matrice de design binaire (individus, trait_0_ou_1)
- 
-
- 
 ```{r 1 cars , eval=TRUE}
 #Load the WGCNA package
 library(WGCNA)
@@ -1015,6 +979,7 @@ gsg = goodSamplesGenes(fa_cv, verbose = 3);
 gsg$allOK
 ```
 
+## Arbre permettant de détecter les valeurs abérrantes
 
 ```{r 6 pressure,fig.width=20,fig.height=20 , eval=TRUE}
 sampleTree = hclust(dist(fa_cv), method = "average");
@@ -1026,7 +991,7 @@ plot(sampleTree, main = "Sample clustering to detect outliers", sub="", xlab="",
 # Plot a line to show the cut
 abline(h = 3000000, col = "red");
 ```
-on va couper le cluster pour retirer l'echantillon aberant
+On va couper le cluster pour retirer l'echantillon aberrant
 
 ```{r 7 pressure , eval=TRUE}
 # Determine cluster under the line
@@ -1042,14 +1007,16 @@ datExpr = fa_cv[keepSamples, ]
 nGenes = ncol(datExpr)
 nSamples = nrow(datExpr)
 #head(datExpr)
-class(datExpr)
+#class(datExpr)
 datExpr <- as.data.frame(datExpr)
 #head(datExpr)
 # datExpr_view <- datExpr[,1:10]
 # datExpr_view
 ```
 
-Liaison échantillons et mesures de phénotype
+## Import trait table
+
+Liaison échantillons et mesures de phénotype avec la table "trait" (analyse binaire)
 
 ```{r 9 pressure, eval=TRUE}
 # Re-cluster samples
@@ -1078,7 +1045,7 @@ lnames = load(file = "fa-dataInput.RData");
 lnames
 ```
 
-On va mettre à la matrice à la puissance 2, puis a la puissance 3 puis 4..... jusqu'à puissance 20
+Détection des modules et construction du réseau WGCNA
 
 ```{r 12 pressure, eval=TRUE}
 # Choose a set of soft-thresholding powers
@@ -1105,16 +1072,12 @@ text(sft$fitIndices[,1], sft$fitIndices[,5], labels = powers, cex = 0.9, col = "
 
 On voit qu'à partir de puissance 7 on atteint le seuil donc pas besoin d'aller jusqu'à puissance 20
 on va mettre matrice de corrélation à la puissance 8 
-graph 2: quand on augmete la puissance on perd des corrélations
 
+Graph 2: quand on augmete la puissance on perd des corrélations
 
-Steps in WGCNA are:
-1. Similarity co-expression matrix (Pearson's correlation).
-2. Adjacency matrix (signed, unsigned, signed-hybrid).
-3. Topological Overlap Matrix (TOM) constructed from adjacency matrix.
-(TOM formula is presented in below image)
-4. Dissimilarity matrix (1-TOM) obtained from TOM.
-*By using TOM matrix, the network in WGCNA assumes not only co-expression information, also it assumes the network topological information.
+## Adjacency matrix
+
+Ci dessous, je choisis 8 comme puissance la plus basse qui construit la scale free topology. Ensuite, la fonction de génere des modules de taille 30, et fusionne les modules similaires à plus de 25% et enregistre la matrice de chevauchement topologique dans un objet.
 
 ```{r 13 pressure, eval=TRUE}
 #coupe le jeu de données en differents blocks pour eviter methode de calculation plus lourde
@@ -1134,6 +1097,12 @@ table(net$colors)
 
 ```
 
+Il y a **26 modules**
+
+## Cluster Dendrogram
+
+Ci-dessous la représentation des modules et du clustering des gènes
+
 ```{r 15 pressure, eval=TRUE}
 # Convert labels to colors for plotting
 mergedColors = labels2colors(net$colors)
@@ -1146,6 +1115,7 @@ plotDendroAndColors(net$dendrograms[[1]], mergedColors[net$blockGenes[[1]]],
                     addGuide = TRUE, guideHang = 0.05)
 ```
 
+Sauvegarde des résultats en .RData
 
 ```{r 16 pressure, eval=TRUE}
 #on transforme en couleurs
@@ -1153,6 +1123,7 @@ plotDendroAndColors(net$dendrograms[[1]], mergedColors[net$blockGenes[[1]]],
 moduleLabels = net$colors
 moduleColors = labels2colors(net$colors)
 MEs = net$MEs;
+head(MEs)
 geneTree = net$dendrograms[[1]];
 save(MEs, moduleLabels, moduleColors, geneTree,
      file = "Transcriptomique-networkConstruction-auto.RData")
@@ -1168,6 +1139,9 @@ lnames
 
 ```
 
+Quantification des associations module-trait
+
+Les modules qui sont significativement associés aux traits cliniques sont mesurés. Nous avons déjà un profil de synthèse calculé (eigengene) pour chaque module, donc nous corrélons simplement les eigengènes avec des traits phénotypiques et recherchons les associations les plus significatives: 
 
 ```{r 18 pressure, eval=TRUE}
 # fa_meta
@@ -1189,7 +1163,9 @@ moduleTraitCor = cor(MEs, fa_trait, use = "p");
 moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples);
 ```
 
-Tableau avec par colonne les genes virtuels par couleur
+## Heatmap relation module/trait
+
+Représentation de chaque module eigengene et son coefficient de corrélation.
 
 ```{r 19 pressure,fig.width=10,fig.height=10, eval=TRUE }
 # Will display correlations and their p-values
@@ -1211,9 +1187,22 @@ labeledHeatmap(Matrix = moduleTraitCor,
                main = paste("Module-trait relationships"))
 
 ```
+Correlation entre la matrice de eigengene MEs et la matrice de datTraits
+On peut voir les fortes correlations rouge foncé ou bleu foncé 
 
-correlation entre la matrice de eigengene MEs et la matrice de datTraits
-on peut voir les fortes correlations rouge foncé ou bleu foncé 
+
+## Eigengene view
+
+```{r dendrogram, eval=TRUE}
+plotEigengeneNetworks(MEs, "Eigengene dendrogram", marDendro = c(0,4,2,0),plotHeatmaps = FALSE)
+```
+Heatmap matrix
+
+```{r heatmap adjacency, eval=TRUE}
+# Plot the heatmap matrix (note: this plot will overwrite the dendrogram plot)
+par(cex = 1.0)
+plotEigengeneNetworks(MEs, "Eigengene adjacency heatmap", marHeatmap = c(3,4,2,2),plotDendrograms = FALSE, xLabelsAngle = 90)
+```
 
 Annotation
 
@@ -1222,33 +1211,42 @@ Annotation
 ```
 
 ```{r 20 pressure, echo=FALSE, eval=TRUE}
-names(datExpr)[moduleColors=="royalblue"]
+#names(datExpr)[moduleColors=="royalblue"]
 #head(datExpr[moduleColors=="royalblue"])
 ```
 
+
 ```{r 21 pressure, eval=TRUE}
-annot <- fa_annotation
-dim(annot)
-dim(datExpr)
-names(annot)
-probes = names(datExpr)
-probes2annot = match(probes, annot$chromosome_name)
-# The following is the number or probes without annotation:
-sum(is.na(probes2annot))
-# Should return 0.
-#head(annot)
-#head(datExpr)
+# annot <- fa_annotation
+# head(fa_annotation)
+# dim(annot)
+# names(annot)
+# 
+# dim(datExpr)
+# 
+# probes = names(datExpr)
+# probes2annot = match(probes, annot$external_gene_name)
+# # The following is the number or probes without annotation:
+# sum(is.na(probes2annot))
+# # Should return 0.
+# #head(annot)
+# #head(datExpr)
+# length(rownames(annot))
+# length(colnames(datExpr))
+# length(intersect(rownames(annot), colnames(datExpr))) ## Their intersection contains the same number of elements
 
-```
 
-
-```{r 22bis, eval=TRUE}
-tdataexpr <- t(datExpr)
-tdataexpr <- as.data.frame(tdataexpr)
-class(annot)
-class(tdataexpr)
-#head(annot)
-#head(tdataexpr)
+# tdataexpr <- t(datExpr)
+# tdataexpr <- as.data.frame(tdataexpr)
+# 
+# class(annot)
+# class(tdataexpr)
+# 
+# head(annot)
+# head(tdataexpr)
+# 
+# dim(annot)
+# dim(tdataexpr)
 # annotbis <- annot[intersect(rownames(annot), rownames(tdataexpr)), ]                               annotbis     
 # rownames(annot)
 # rownames(tdataexpr)
@@ -1258,76 +1256,51 @@ class(tdataexpr)
 # annot["ENSMUSG00000000001", ]
 # annot[head(intersect(rownames(annot), rownames(tdataexpr))), ]
 
-annot <- annot[(intersect(rownames(annot), rownames(tdataexpr))), ]
-#annot
-
-dim(annot)
-dim(datExpr)
-```
-
-
-```{r 23bis, eval=TRUE}
-# # Create the starting data frame
-# geneInfo0 = data.frame(chromosome_name = probes,
-#                       moduleColor = moduleColors,
-#                       geneTraitSignificance,
-#                       GSPvalue)
-# # Order modules by their significance for weight
-# modOrder = order(-abs(cor(MEs, weight, use = "p")));
-# # Add module membership information in the chosen order
-# for (mod in 1:ncol(geneModuleMembership))
-# {
-#   oldNames = names(geneInfo0)
-#   geneInfo0 = data.frame(geneInfo0, geneModuleMembership[, modOrder[mod]], 
-#                          MMPvalue[, modOrder[mod]]);
-#   names(geneInfo0) = c(oldNames, paste("MM.", modNames[modOrder[mod]], sep=""),
-#                        paste("p.MM.", modNames[modOrder[mod]], sep=""))
-# }
-# # Order the genes in the geneInfo variable first by module color, then by geneTraitSignificance
-# geneOrder = order(geneInfo0$moduleColor, -abs(geneInfo0$GS.weight));
-# geneInfo = geneInfo0[geneOrder, ]
+# annotbis <- annot[(intersect(rownames(annot), rownames(tdataexpr))), ]
+# dim(annotbis)
 
 ```
 
+## Export Cytoscape
 
-```{r 24 pressure, eval=TRUE}
+```{r}
 # Recalculate topological overlap if needed
-TOM = TOMsimilarityFromExpr(datExpr, power = 8);
+TOM=TOMsimilarityFromExpr(datExpr, power=8)
 # Read in the annotation file
-annot = read.csv(file = "fa_annotations.csv");
+#annot=read.csv(file="data/GeneAnnotation.csv")
 # Select modules
-modules = c("royalblue", "black");
+modules=c("darkgrey","grey")
 # Select module probes
-probes = names(datExpr)
-inModule = is.finite(match(moduleColors, modules));
-modProbes = probes[inModule];
-modGenes = annot$gene_symbol[match(modProbes, annot$chromosome_name)];
+probes=colnames(datExpr)
+inModule=is.finite(match(moduleColors, modules))
+modProbes=probes[inModule]
+#modGenes=annot$gene_symbol[match(modProbes, annot$substanceBXH)]
 # Select the corresponding Topological Overlap
-modTOM = TOM[inModule, inModule];
-dimnames(modTOM) = list(modProbes, modProbes)
+modTOM=TOM[inModule, inModule]
+dimnames(modTOM)=list(modProbes, modProbes)
 # Export the network into edge and node list files Cytoscape can read
-cyt = exportNetworkToCytoscape(modTOM,
-  edgeFile = paste("CytoscapeInput-edges-", paste(modules, collapse="-"), ".txt", sep=""),
-  nodeFile = paste("CytoscapeInput-nodes-", paste(modules, collapse="-"), ".txt", sep=""),
-  weighted = TRUE,
-  threshold = 0.5,
-  nodeNames = modProbes,
-  altNodeNames = modGenes,
-  nodeAttr = moduleColors[inModule]);
+cyt=exportNetworkToCytoscape(modTOM,
+                        edgeFile=paste("CytoscapeInput-edges-",paste(modules, collapse="-"),".txt", sep=""),
+                        nodeFile=paste("CytoscapeInput-nodes-",paste(modules, collapse="-"),".txt", sep=""),
+                        weighted=TRUE,
+                        threshold=0.5,
+                        nodeNames=modProbes)
+                        #altNodeName
 
 ```
 
-Open these two files as node table and edge table with Cytoscape and inspect the network of the brown-red modules
+<div class="alert alert-danger" role="alert">Je ne comprends pas pourquoi mes exports nodes et edges sont vides donc pas possible de passer à Cytoscape</div>
 
 
+**Mémo** 
 
-
-
-
-## Conclusions générales
-
-Résumez en quelques phrases vos conclusions à partir des résultats obtenus. 
-
+Steps in WGCNA are:
+1. Similarity co-expression matrix (Pearson's correlation).
+2. Adjacency matrix (signed, unsigned, signed-hybrid).
+3. Topological Overlap Matrix (TOM) constructed from adjacency matrix.
+(TOM formula is presented in below image)
+4. Dissimilarity matrix (1-TOM) obtained from TOM.
+*By using TOM matrix, the network in WGCNA assumes not only co-expression information, also it assumes the network topological information.
 
 
 ## Session info
