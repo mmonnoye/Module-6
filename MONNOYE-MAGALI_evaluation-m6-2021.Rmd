@@ -1,0 +1,1207 @@
+---
+title: "Mini-projet 2021 - Module 6 Bioinformatique Intégrative"
+author: "Magali Monnoye"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    self_contained: yes
+    code_download: true
+    fig_caption: yes
+    highlight: zenburn
+    theme: cerulean
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    code_folding: "hide"
+  pdf_document:
+    fig_caption: yes
+    highlight: zenburn
+    toc: yes
+    toc_depth: 3
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+```{r settings, include=FALSE, echo=FALSE, eval=TRUE}
+options(width = 300)
+# options(encoding = 'UTF-8')
+knitr::opts_chunk$set(
+  fig.width = 7, fig.height = 5, 
+  fig.path = 'figures/mini-projet_',
+  fig.align = "center", 
+  size = "tiny", 
+  echo = TRUE, 
+  eval = TRUE, 
+  warning = FALSE, 
+  message = FALSE, 
+  results = TRUE, 
+  comment = "")
+
+options(scipen = 12) ## Max number of digits for non-scientific notation
+# knitr::asis_output("\\footnotesize")
+```
+
+J'importe les librairies
+
+```{r libraries, echo=FALSE, eval=TRUE}
+#### Required libraries ####
+
+# Load required CRAN R libraries
+required_cranLib <- c("knitr", 
+                      "FactoMineR", 
+                      "factoextra", 
+                      "gprofiler2",
+                      "pheatmap",
+                      "dplyr")
+for (lib in required_cranLib) {
+  if (!require(lib, character.only = TRUE)) {
+    install.packages(lib)
+  }
+  require(lib, character.only = TRUE)
+}
+
+kable(as.data.frame(c(required_cranLib)),
+      col.names = "libraries",
+      caption = "Loaded required libraries"
+    )
+
+```
+
+# Synopsis du projet
+
+## Données
+
+[Pavkovic, M., Pantano, L., Gerlach, C.V. et al. Multi omics analysis of fibrotic kidneys in two mouse models. Sci Data 6, 92 (2019)](https://www.nature.com/articles/s41597-019-0095-5)
+
+Samples from two mouse models were collected. The first one is a reversible chemical-induced injury model (folic acid (FA) induced nephropathy). The second one is an irreversible surgically-induced fibrosis model (unilateral ureteral obstruction (UUO)). mRNA and small RNA sequencing, as well as 10-plex tandem mass tag (TMT) proteomics were performed with kidney samples from different time points over the course of fibrosis development. 
+
+**Rappel sur les échantillons:**
+
+Deux modèles de fibrose rénale chez la souris sont étudiés:
+
+1. Le premier est un modèle de néphropathie réversible induite par l'acide folique (folic acid (FA)). Les souris ont été sacrifiées avant le traitement (normal), puis à jour 1, 2, 7 et 14 (day1,...) après une seule injection d'acide folique.
+
+2. Le second est un modèle irréversible induit chrirurgicalement (unilateral ureteral obstruction (UUO)). les souris ont été sacrifiées avant obstruction (day 0) et à 3, 7 et 14 jours après obstruction par ligation de l'uretère du rein gauche.
+
+A partir de ces extraits de rein, l'ARN messager total et les petits ARNs ont été séquencés et les protéines caratérisées par spectrométrie de masse en tandem (TMT).
+
+[Supplementary material of the article with all the data tables (zip archive):](https://zenodo.org/record/2592516)
+
+[Les données se trouvent aussi dans le dépôt github](https://github.com/DU-Bii/module-3-Stat-R/raw/master/stat-R_2021/data/pavkovic_2019/)
+
+Les comptages du modèle FA sont dans
+tables/fa/results/counts/ pour la transcriptomique
+tables/pfa/results/counts/ pour la protéomique
+
+Les comptages du modèle UUO sont dans
+tables/uuo/results/counts/ pour la transcriptomique
+tables/puuo/results/counts/ pour la protéomique
+
+Nous travaillerons sur le modèle **FA**.
+
+# Import données
+
+Je télécharge les quatre fichiers dans un dossier local `~/Module6Projet`, et les charge dans les data.frames suivants: 
+
+- Données brutes de transcriptome: `fa_expr`
+- Métadonnées transcriptome: `fa_meta`
+- Données brutes de proteomique: `pfa_expr`
+- Métadonnées transcriptome: `pfa_meta`
+
+J'importe directement les données normalisées
+
+## Download the files
+
+```{r solution_download-load_functions, eval=TRUE}
+#' @title Download a file only if it is not yet here
+#' @author Jacques van Helden email{Jacques.van-Helden@@france-bioinformatique.fr}
+#' @param url_base base of the URL, that will be prepended to the file name
+#' @param file_name name of the file (should not contain any path)
+#' @param local_folder path of a local folder where the file should be stored
+#' @return the function returns the path of the local file, built from local_folder and file_name
+#' @export
+downloadOnlyOnce <- function(url_base, 
+                             file_name,
+                             local_folder) {
+
+  ## Define the source URL  
+  url <- file.path(url_base, file_name)
+  message("Source URL\n\t",  url)
+
+  ## Define the local file
+  local_file <- file.path(local_folder, file_name)
+  
+  ## Create the local data folder if it does not exist
+  dir.create(local_folder, showWarnings = FALSE, recursive = TRUE)
+  
+  ## Download the file ONLY if it is not already there
+  if (!file.exists(local_file)) {
+    message("Downloading file from source URL to local file\n\t", 
+            local_file)
+    download.file(url = url, destfile = local_file)
+  } else {
+    message("Local file already exists, no need to download\n\t", 
+            local_file)
+  }
+  
+  return(local_file)
+}
+```
+
+
+```{r download_fa, eval=TRUE}
+## Specify the basic parameters
+pavkovic_base <- "https://github.com/DU-Bii/module-3-Stat-R/tree/master/stat-R_2021/data/pavkovic_2019"
+pavkovic_folder <- "~/DUBii-m3_data/pavkovic_2019"
+
+#### Dowload folic acid data and metadata ####
+
+## Transcriptome data table
+local_fa_file <- downloadOnlyOnce(
+  url_base = pavkovic_base, 
+  file_name = "fa_raw_counts.tsv.gz",
+  local_folder =  pavkovic_folder
+)
+
+## Transcriptome data table normalized
+local_fa_file_norm <- downloadOnlyOnce(
+  url_base = pavkovic_base, 
+  file_name = "fa_normalized_counts.tsv.gz",
+  local_folder =  pavkovic_folder
+)
+
+## Transcriptome metadata
+trans_metadata_file <- downloadOnlyOnce(
+  url_base = pavkovic_base, 
+  file_name = "fa_transcriptome_metadata.tsv",
+  local_folder =  pavkovic_folder
+)
+
+## Proteome data table
+local_pfa_file <- downloadOnlyOnce(
+  url_base = pavkovic_base, 
+  file_name = "pfa_model_counts.tsv.gz",
+  local_folder =  pavkovic_folder
+)
+
+## Proteome data table normalized
+local_pfa_file_norm <- downloadOnlyOnce(
+  url_base = pavkovic_base, 
+  file_name = "pfa_model_log2_counts.tsv.gz",
+  local_folder =  pavkovic_folder
+)
+
+## Proteome metadata
+prot_metadata_file <- downloadOnlyOnce(
+  url_base = pavkovic_base, 
+  file_name = "pfa_proteome_metadata.tsv",
+  local_folder =  pavkovic_folder
+)
+
+
+
+```
+
+## Loading the files
+
+```{r my_easy_load_function, eval=TRUE}
+#' @title Load a tab-separated value file and manually set row ames after having forced them to unique values
+#' @author Jacques van Helden email{Jacques.van-Helden@@france-bioinformatique.fr}
+#' @param file file path
+#' @param header=1 Header is set to 1 by default
+#' @param sep="\t" Column separator is set to tab by default
+#' @param rownames.col=1 Column containing the row names
+#' @param ... all other parameters are passed to read.delim()
+#' @return a data frame with the loaded data
+load_fix_row_names <- function(file, 
+                       header = 1, 
+                       sep = "\t",
+                       rownames.col = 1, 
+                       ...) {
+  x <- read.delim(file = file, ...)
+  rownames(x) <- make.names(x[, rownames.col], unique = TRUE)
+  x <- x[, -rownames.col]
+  return(x)
+}
+
+```
+
+
+```{r load_fa, out.width="80%", eval=TRUE}
+
+## Load transcriptome data
+fa <- read.delim(file = local_fa_file, sep = "\t", header = TRUE)
+
+## Load same data with load_fix_row_names
+fa_expr <- load_fix_row_names(file = local_fa_file, rownames.col = 1)
+kable(head(fa_expr), caption = "Loaded with myEasyLad() fa")
+
+## Load transcriptome data normalized
+fa_norm <- read.delim(file = local_fa_file_norm, sep = "\t", header = TRUE)
+
+## Load same data with load_fix_row_names
+fa_expr_norm <- load_fix_row_names(file = local_fa_file_norm, rownames.col = 1)
+kable(head(fa_expr_norm), caption = "Loaded with myEasyLad() fa normalized")
+
+
+## Load proteome data
+pfa_expr <- load_fix_row_names(file = local_pfa_file, rownames.col = 1)
+kable(head(pfa_expr), caption = "Loaded with myEasyLad() pfa")
+
+## Load proteome data normalized
+pfa_expr_norm <- load_fix_row_names(file = local_pfa_file_norm, rownames.col = 1)
+kable(head(pfa_expr_norm), caption = "Loaded with myEasyLad() pfa normalized")
+
+## Load transcriptome metadata
+fa_meta <- read.delim(file = trans_metadata_file, sep = "\t", header = TRUE)
+kable(fa_meta, caption = "Metadata for the transcriptome dataset fa")
+
+## Load proteome metadata
+pfa_meta <- read.delim(file = prot_metadata_file, sep = "\t", header = TRUE)
+kable(pfa_meta, caption = "Metadata for the proteome dataset pfa")
+
+```
+
+Structure de chaque dataframe.
+
+```{r insepct data, eval=TRUE}
+str(fa_expr)
+str(fa_expr_norm)
+str(fa_meta)
+str(pfa_expr)
+str(pfa_expr_norm)
+str(pfa_meta)
+```
+
+Je supprime le groupe day3 du fichier metadata pfa 
+
+```{r delete day3, eval=TRUE}
+
+pfa_meta <- pfa_meta %>% filter(condition != "day3")
+str(pfa_meta)
+```
+
+Les deux fichiers fa ne donnent pas les observations de l'échantillon dans le même ordre:
+
+```{r check data order, eval=TRUE}
+fa_meta$sampleName == names(fa_expr)
+
+```
+
+Donc je réorganise les échantillons dans l'ordre de l'expérience: condition normale, puis day 1 à 14 avec les 3 réplicats.
+
+```{r reoder data, eval=TRUE}
+sample_order <- c(paste(rep(c("normal", "day1", "day2", "day3", "day7", "day14"), each = 3),
+                        1:3, sep = "_"))
+
+fa_expr <- fa_expr[,sample_order]
+fa_meta <- fa_meta[match(sample_order, fa_meta$sampleName),]
+
+fa_expr_norm <- fa_expr_norm[,sample_order]
+fa_meta <- fa_meta[match(sample_order, fa_meta$sampleName),]
+
+```
+
+J'ai maintenant les deux jeux de données avec pour chaque un fichier metadata et une table de counts raw ou normalized:
+
+- fa_expr
+
+- fa_expr_norm
+
+- fa_meta
+
+- pfa_expr
+
+- pfa_expr_norm
+
+- pfa_meta
+
+```{r bilan table, eval=TRUE}
+head(fa_expr)
+head(fa_expr_norm)
+fa_meta
+head(pfa_expr)
+head(pfa_expr_norm)
+pfa_meta
+
+```
+
+# Analyses différentielles DESeq2 
+
+Analyse d’expression différentielle pour les données de protéomique et transcriptomique => identifier les gènes/protéines significativement différentiellement exprimés dans le modèle FA en comparant Day 7 à Day 0. 
+
+## Modèle fa en comparant Day 7 à normal
+
+```{r 1, eval=TRUE}
+#?DESeq
+library("DESeq2")
+```
+
+Préparation objet **DESeq2**
+
+```{r 2, eval=TRUE}
+
+# id <- pfa_expr [,1]
+# pfa_expr <- pfa_expr[,-1]
+# rownames(pfa_expr) <- make.names(id, unique = TRUE)
+
+#any (fa_DataMatrix [,-1] < 0)
+
+fa_DataMatrix <- as.matrix(fa_expr)
+
+dds <- DESeqDataSetFromMatrix(countData = round(fa_DataMatrix), colData = fa_meta, design = ~ condition)
+dds
+```
+
+Run fonction DESeq2
+
+```{r 3, eval=TRUE}
+dds <- DESeq(dds)
+```
+
+Table de résultats du DESeq2 entre les groupes **normal** et **day7**
+
+```{r 4, eval=TRUE}
+res <- results(dds, contrast=c("condition", "normal", "day7"))
+head(res)
+```
+
+Combien de gènes sont **significatifs > 0.05**
+
+```{r 5, eval=TRUE}
+table(res$padj < 0.05)
+```
+
+Je classe la table par **ordre décroissant de padj**
+
+```{r 6, eval=TRUE}
+orderedRes <- res[ order(res$padj), ]
+head(orderedRes)
+```
+
+Je **normalise** la table
+
+```{r 7, eval=TRUE}
+normCounts <- counts(dds, normalized = TRUE)
+head(normCounts)
+```
+
+Visualisation des **estimations de dispersion** de DESeq2
+
+```{r 8, eval=TRUE}
+plotDispEsts(dds)
+```
+
+- Les points noirs sont la représentation "brute" des gènes (forte variabilité)
+
+- La ligne de tendance rouge (dépendance des dispersions à la moyenne)
+
+- Les points bleus représentent l'estimation de chaque gène vers la ligne rouge 
+
+- Les cercles bleus au-dessus du «nuage» principal représentent des gènes avec des valeurs aberrantes de dispersion.
+
+Distribution des **pvalues**
+
+```{r 9, eval=TRUE}
+hist(orderedRes$pvalue, breaks=0:50/50, xlab="p value", main="Histogram of nominal p values")
+```
+
+Heatmap des **20 gènes les plus différentiellement exprimés**. 
+
+```{r 10, eval=TRUE}
+library(pheatmap)
+
+# select the 20 most differentially expressed genes
+select <- row.names(orderedRes[1:20, ])
+
+# transform the counts to log10
+log10_normCounts <- log10(normCounts + 1)
+
+# get the values for the selected genes
+values <- log10_normCounts[ select, ]
+
+pheatmap(values,
+         scale = "none", 
+         cluster_rows = FALSE, 
+         cluster_cols = FALSE,
+         fontsize_row = 8,
+         annotation_names_col = FALSE,
+         #gaps_col = c(3,6),
+         display_numbers = TRUE,
+         number_format = "%.2f",         
+         height=12,
+         width=6)
+```
+
+## Modèle pfa en comparant Day 7 à normal
+
+Préparation objet DESeq2
+
+```{r 11, eval=TRUE}
+
+# id <- pfa_expr [,1]
+# pfa_expr <- pfa_expr[,-1]
+# rownames(pfa_expr) <- make.names(id, unique = TRUE)
+
+#any (fa_DataMatrix [,-1] < 0)
+
+pfa_DataMatrix <- as.matrix(pfa_expr)
+
+dds <- DESeqDataSetFromMatrix(countData = round(pfa_DataMatrix), colData = pfa_meta, design = ~ condition)
+dds
+```
+
+Run fonction DESeq2
+
+```{r 12, eval=TRUE}
+dds <- DESeq(dds)
+```
+
+Table de résultats du DESeq2 entre les groupes **normal** et **day7**
+
+```{r 13 , eval=TRUE}
+res <- results(dds, contrast=c("condition", "normal", "day7"))
+head(res)
+```
+
+Combien de gènes sont **significatifs > 0.05**
+
+```{r 14, eval=TRUE}
+table(res$padj < 0.05)
+```
+
+Je classe la table par **ordre décroissant de padj**
+
+```{r 15, eval=TRUE}
+orderedRes <- res[ order(res$padj), ]
+head(orderedRes)
+```
+
+Je **normalise** la table
+
+```{r 16, eval=TRUE}
+normCounts <- counts(dds, normalized = TRUE)
+head(normCounts)
+```
+
+Visualisation des **estimations de dispersion** de DESeq2
+
+```{r 17, eval=TRUE}
+plotDispEsts(dds)
+```
+
+Distribution des **pvalues**
+
+```{r 18, eval=TRUE}
+hist(orderedRes$pvalue, breaks=0:50/50, xlab="p value", main="Histogram of nominal p values")
+```
+
+Heatmap des **20 gènes les plus différentiellement exprimés**. 
+
+```{r 19, eval=TRUE}
+
+# select the 20 most differentially expressed genes
+select <- row.names(orderedRes[1:20, ])
+
+# transform the counts to log10
+log10_normCounts <- log10(normCounts + 1)
+
+# get the values for the selected genes
+values <- log10_normCounts[ select, ]
+
+pheatmap(values,
+         scale = "none", 
+         cluster_rows = FALSE, 
+         cluster_cols = FALSE,
+         fontsize_row = 8,
+         annotation_names_col = FALSE,
+         #gaps_col = c(3,6),
+         display_numbers = TRUE,
+         number_format = "%.2f",         
+         height=12,
+         width=6)
+```
+
+# MixOmics
+
+Analyse multi-omique (transcripto + protéo) avec, au choix, MOFA, mixOmics, mixKernel ou d’autres outils de factorisation multi-matrices. Vous pouvez soit vous focaliser sur un time point, soit intégrer les différents time points, en partant des données normalisées fournies dans le matériel supplémentaire du papier.
+
+
+## Préparation des tables 
+
+Il y a 18 échantillons pour l'expérience fa et 10 pour l'expérience pfa, il faut donc supprimer les 6 échantillons supplémentaire de la table fa.
+
+Il faut également uniformiser la table metadata en conséquence.
+
+```{r 20 ,eval=TRUE}
+
+head(fa_expr_norm)
+
+fa <- fa_expr_norm[,- c(3,6,9,10,11,12,15,18)]
+head(fa)
+
+pfa <- pfa_expr_norm
+head(pfa)
+
+metadata <- pfa_meta[,- 1]
+metadata
+```
+
+```{r 21, eval= TRUE}
+
+#Je retire le rawnames original (les chiffres 1,2,3...)
+rownames(metadata) <- NULL
+metadata
+# add the rownames as a proper column
+library(tibble)
+metadata <- column_to_rownames(metadata, var = "sampleName") 
+
+rownames(metadata)
+colnames(fa)
+colnames(pfa)
+```
+
+## Filtres 
+
+Je regarde combien il y a de lignes avec des zéros dans la table fa et je les supprime et je filtre les genes où il y au moins de 3 échantillons avec des counts supérieurs ou égaux à 5
+
+```{r 22, eval=TRUE}
+dim(fa)
+#voir le nombre de lignes avec zero counts
+rs <- rowSums(fa)
+nbgenes_at_zeros <- length(which(rs==0))
+nbgenes_at_zeros
+
+#Je supprime les lignes avec zero counts
+fa <- fa[rowSums(fa[, -1])>0, ]
+#Je ne garde que les genes où il y a moins de 3 échantillons avec des counts supérieurs ou égaux à 5. 
+fa <- fa[rowSums((fa[, -1])>=5)>= 3 , ]
+dim(fa)
+```
+
+Idem pour la table pfa
+
+```{r 23, eval=TRUE}
+dim(pfa)
+rs <- rowSums(pfa)
+nbgenes_at_zeros <- length(which(rs==0))
+nbgenes_at_zeros
+
+pfa <- pfa[rowSums((pfa[, -1])>=5)>= 3 , ]
+
+dim(pfa)
+
+```
+
+Il faut également transposer les counts tables
+
+```{r 24 ,eval=TRUE}
+
+fa_t <- t(fa)
+str(fa_t)
+dim(fa_t)
+class(fa_t)
+
+pfa_t <- t(pfa_expr_norm)
+str(pfa_t)
+dim(pfa_t)
+class(pfa_t)
+
+dim(metadata)
+
+```
+
+J'ai donc maintenant les deux counts tables avec 10 échantillons 
+
+## Import package
+
+```{r 25 load package, eval= TRUE}
+library(mixOmics)
+
+```
+
+## Analyses uni omic 
+
+### PCA
+
+```{r 2.pca, echo=FALSE, eval= TRUE}
+
+pca.fa_t <- pca(fa_t, ncomp=10)
+plot(pca.fa_t, main="Composantes PCA fa")
+plotIndiv(pca.fa_t, group = metadata$condition, comp= c(1,2), ind.names = FALSE, legend=TRUE,title = "PCA PlotIndiv PC1 & PC2 fa")
+
+pca.pfa_t <- pca(pfa_t, ncomp=10)
+plot(pca.pfa_t, main="Composantes PCA pfa")
+plotIndiv(pca.pfa_t, group = metadata$condition, comp= c(1,2), ind.names = FALSE, legend=TRUE,title = "PCA PlotIndiv PC1 & PC2 pfa")
+
+```
+
+### Sparse PCA
+
+```{r 2.sparse pca, eval= TRUE}
+
+spca.fa_t <- spca(fa_t, ncomp=3, keepX=c(10,10,10))
+spca.pfa_t <- spca(pfa_t, ncomp=3, keepX=c(10,10,10))
+#?spca
+
+plotIndiv(spca.fa_t, group = metadata$condition, comp= c(1,2), ind.names = FALSE, legend=TRUE,title = "Sparse PCA PlotIndiv PC1 & PC2 fa")
+
+plotIndiv(spca.pfa_t, group = metadata$condition, comp= c(1,2), ind.names = FALSE, legend=TRUE,title = "Sparse PCA PlotIndiv PC1 & PC2 Pfa")
+
+plotVar(spca.fa_t, var.names = FALSE, comp= c(1,2),title = "PlotVar PC1 & PC2 fa")
+plotVar(spca.pfa_t, var.names = FALSE, comp= c(1,2),title = "PlotVar PC1 & PC2 pfa")
+
+```
+
+### PLS-DA
+
+**Analyses multivariées supervisées** 
+
+```{r 2.pls da, eval= TRUE}
+
+W <- metadata$condition
+
+plsda.fa_t <- mixOmics::plsda(fa_t, W, ncomp = 3)
+plsda.pfa_t <- mixOmics::plsda(pfa_t, W, ncomp = 3)
+
+#Error: could not find function "plsda" donc rajouter mixOmics::
+mixOmics::plotIndiv(plsda.fa_t, comp= c(1,2), ind.names=FALSE, legend=TRUE,title = "PLS-DA PlotIndiv PC1 & PC2 fa")
+mixOmics::plotIndiv(plsda.pfa_t, comp= c(1,2), ind.names=FALSE, legend=TRUE,title = "PLS-DA PlotIndiv PC1 & PC2 fa")
+
+mixOmics::plotLoadings(plsda.fa_t, comp=1, contrib = "max")
+mixOmics::plotLoadings(plsda.fa_t, comp=2, contrib = "max")
+mixOmics::plotLoadings(plsda.pfa_t, comp=1, contrib = "max")
+mixOmics::plotLoadings(plsda.pfa_t, comp=2, contrib = "max")
+
+```
+
+### Sparse PLS-DA
+
+```{r 2.sparse pls da, eval= TRUE}
+splsda.fa_t <- splsda(fa_t, W, ncomp = 3, keepX = c(10,10,10))
+splsda.pfa_t <- splsda(pfa_t, W, ncomp = 3, keepX = c(10,10,10))
+
+plotIndiv(splsda.fa_t, ind.names=FALSE, legend=TRUE,comp = c(1,2),title = "Sparse PLS-DA PlotIndiv PC1 & PC2 fa")
+plotIndiv(splsda.pfa_t, ind.names=FALSE, legend=TRUE,comp = c(1,2),title = "Sparse PLS-DA PlotIndiv PC1 & PC2 fa")
+
+plotVar(splsda.fa_t, var.names = TRUE, comp= c(1,2),title = "PlotVar PC1 & PC2 fa")
+plotVar(splsda.pfa_t, var.names = TRUE, comp= c(1,2),title = "PlotVar PC1 & PC2 pfa")
+
+plotLoadings(splsda.fa_t, comp=1, contrib = 'max')
+plotLoadings(splsda.fa_t, comp=2, contrib = 'max')
+plotLoadings(splsda.pfa_t, comp=1, contrib = 'max')
+plotLoadings(splsda.pfa_t, comp=2, contrib = 'max')
+
+```
+
+## Analyses multi omics 
+
+### PLS
+
+```{r pls, eval= TRUE}
+
+pls.fa.pfa <- pls(fa_t,pfa_t) 
+
+plotIndiv(pls.fa.pfa,rep.space="XY-variate",
+          title = "plotIndiv PLS",
+          ind.names=FALSE,
+          group=metadata$condition,
+          pch = as.numeric(factor(metadata$condition)),
+          pch.levels =metadata$condition,
+          legend = TRUE)
+
+plotVar(pls.fa.pfa, var.names = c(FALSE, FALSE))
+```
+
+### S-PLS
+
+```{r s pls, eval= TRUE ,fig.width=20,fig.height=20 }
+
+spls.fa.pfa <- spls(fa_t,pfa_t, ncomp=10, keepX = c(10,10,10))
+
+plotIndiv(spls.fa.pfa,rep.space="XY-variate",
+          title = "plotIndiv Sparse PLS",
+          ind.names=FALSE,
+          group=metadata$condition,
+          pch = as.numeric(factor(metadata$condition)),
+          pch.levels =metadata$condition,
+          legend = TRUE)
+
+plotVar(spls.fa.pfa, var.names = c(FALSE, FALSE))
+
+plotLoadings(spls.fa.pfa, comp=1, size.title = 1,name.var = NULL, max.name.length = 50)
+plotLoadings(spls.fa.pfa, comp=2, size.title = 1,name.var = NULL, max.name.length = 50)
+```
+
+### Multi-block PLS-DA
+
+```{r block plsda, eval= TRUE}
+
+block.plsda.fa.pfa <- block.plsda(
+  X = list(Genes = fa_t,
+           Proteins = pfa_t),
+  Y = metadata$condition)
+
+plotIndiv(block.plsda.fa.pfa)
+plotVar(block.plsda.fa.pfa, var.names = c(FALSE, FALSE))
+```
+
+### Multi-block S-PLS-DA / DIABLO
+
+```{r data, eval= TRUE}
+data <- list(Genes = fa_t,
+           Proteins = pfa_t)
+
+lapply(data, dim)
+
+Y <- metadata$condition
+Y
+```
+
+#### Design
+
+```{r design, eval= TRUE}
+design = matrix(0.1, ncol = length(data), nrow = length(data), 
+                dimnames = list(names(data), names(data)))
+diag(design) = 0
+
+design 
+```
+
+Tout d'abord, nous ajustons un modèle DIABLO sans sélection de variable pour évaluer la performance globale et choisir le nombre de composants pour le modèle DIABLO final. La fonction perf est exécutée avec une validation croisée 10 fois répétée 10 fois. 
+
+```{r perf diablo, eval= TRUE}
+sgccda.res = block.splsda(X = data, Y = Y, ncomp = 10, design = design)
+
+#set.seed(123) # for reproducibility, only when the `cpus' argument is not used
+# this code takes a couple of min to run
+#perf.diablo = perf(sgccda.res, validation = 'Mfold', folds = 2, nrepeat = 3)
+
+#perf.diablo  # lists the different outputs
+#plot(perf.diablo) 
+```
+
+```{r  choice,eval=TRUE}
+#perf.diablo$choice.ncomp$WeightedVote
+```
+
+```{r  ncomp,eval=TRUE}
+#ncomp = perf.diablo$choice.ncomp$WeightedVote["Overall.BER", "centroids.dist"]
+#ncomp
+```
+
+Le nombre de composantes à garder est de 4
+
+#### Tuning keepX
+
+Je choisis le nombre optimal de variables à sélectionner dans chaque ensemble de données à l'aide de la fonction tune.block.splsda.
+
+```{r  test keepx,eval=TRUE}
+# #set.seed(123) # for reproducibility, only when the `cpus' argument is not used
+#  test.keepX = list (microbiote = c(1:9, seq(10, 45, 5), seq(50,150,10)),
+#                     caecum = c(1:9, seq(10, 45, 5), seq(50,150,10)),
+#                     hypothalamus = c(1:9, seq(10,45 , 5), seq(50,150,10)))
+# 
+#  tune.TCGA = tune.block.splsda(X = data, Y = Y, ncomp = ncomp,
+#                                test.keepX = test.keepX, design = design,
+#                                validation = 'Mfold', folds = 10, nrepeat = 1,
+#                                 dist = "centroids.dist")
+# 
+# 
+# list.keepX = tune.TCGA$choice.keepX
+# 
+# #qsub -cwd -V -N test_keepX -q long.q -pe thread 4 -o test_keepX.out -e test_keepX.err -b y "Rscript test_keepX.R"
+#  
+list.keepX <- list(Genes = c(4, 6,5,5), Proteins = c(5,7,5,6))
+list.keepX
+
+```
+
+#### Final model
+
+```{r  keepX,eval=TRUE}
+sgccda.res = block.splsda(X = data, Y = Y, ncomp = 4, 
+                          keepX = list.keepX, design = design)
+```
+
+plotDIABLO est un tracé de diagnostic pour vérifier si la corrélation entre les composants de chaque ensemble de données a été maximisée comme spécifié dans la matrice de conception. 
+
+```{r  diablo,eval=TRUE}
+plotDiablo(sgccda.res, ncomp = 4)
+plotIndiv(sgccda.res, ind.names = FALSE, legend = TRUE, title = 'DIABLO')
+plotArrow(sgccda.res, ind.names = FALSE, legend = TRUE, title = 'DIABLO')
+
+```
+#### Variable plots
+
+```{r  plotvar,eval=TRUE}
+plotVar(sgccda.res, var.names = FALSE, style = 'graphics', legend = TRUE, 
+        pch = c(16, 17), cex = c(2,2), col = c('darkorchid', 'brown1'))
+```
+
+```{r circosplot, eval= TRUE}
+circosPlot(sgccda.res, cutoff = 0.7, line = TRUE, 
+           color.blocks= c('darkorchid', 'brown1'),
+           color.cor = c("chocolate3","grey20"), size.labels = 1.5)
+```
+
+# WGCNA
+
+Reconstruct the co-expression network from all the time points of the FA transcriptomics data. Propose to filter and remove all the zero expressed genes, the NAs and the less informative genes from the transcriptomics data. (I remove all the genes that are not expressed in at least 9 out of the 18 conditions (expression > 1 TPM in 9) and then filter with the coefficient of variation > 0.75).
+
+Then apply the first part of the network reconstruction steps as we saw them on the WGCNA course until the module predictions.
+
+Instead of using WGCNA’s module prediction routines, apply a universal threshold of 0.5 on the adjacency matrix, and obtain an adjacency matrix that is reduced in size. This is the network.
+
+```{r 1 cars , eval=TRUE}
+#Load the WGCNA package
+library(WGCNA)
+
+```
+
+J'utilise les données de transtriptomique **fa normalisées**
+
+J'harmonise les row.names entre la count table et les metadatas
+
+```{r 2 cars , eval=TRUE}
+
+head(fa_expr_norm)
+class(fa_expr_norm)
+
+fa_meta  <- read.csv("fa_meta.csv",sep="," , row.names = 1, header = TRUE)
+fa_meta <- fa_meta[,-c(3,4)]
+fa_meta
+
+fa_annotation  <- read.csv("fa_annotations.csv",sep=";" , row.names = 1, header = TRUE)
+head(fa_annotation)
+
+fa_trait <- read.csv("fa_trait.csv",sep="," , row.names = 1, header = TRUE)
+fa_trait
+
+## Classer suivant ordre colonne Name de fa_meta
+sample_order <- order(fa_meta$sampleName)
+fa_meta <- fa_meta[sample_order, ]
+
+## Ordre des echantillons de data table idem fa_meta table
+fa_expr_norm <- fa_expr_norm[, row.names(fa_meta)]
+head(fa_expr_norm)
+fa_meta
+```
+## Filtres 
+
+Je filtre et je supprime tous les gènes non exprimés, les NA et je supprime tous les gènes qui ne sont pas exprimés dans au moins 9 des 18 conditions (expression> 1 TPM dans 9) 
+
+Puis filtre avec le coefficient de variation> 0,75).
+
+```{r 3 , eval=TRUE}
+dim(fa_expr_norm)
+#voir le nombre de lignes avec zero counts
+rs <- rowSums(fa_expr_norm)
+nbgenes_at_zeros <- length(which(rs==0))
+nbgenes_at_zeros
+#Je supprime les lignes avec zero counts
+fa_expr_norm <- fa_expr_norm[rowSums(fa_expr_norm[, -1])>0, ]
+dim(fa_expr_norm)
+
+#Je supprime les NA
+library(tidyr)
+fa_expr_norm <- fa_expr_norm %>% drop_na()
+dim(fa_expr_norm)
+
+#Je ne garde que les genes où il y a moins de 9 échantillons avec des counts supérieurs ou égaux à 1. 
+
+#fa_969 <- fa_expr_norm[rowSums((fa_expr_norm[, -1])>=1) >= 9, ]
+#dim(fa_969)
+ 
+nbexpr <- apply(fa_expr_norm, 1, function(x){length(which(x>=1))})
+isexpr <- which(nbexpr>=9)
+fa_filtre <- fa_expr_norm[isexpr,]
+dim(fa_filtre)
+```
+
+Je filtre avec le coefficient de variation> 0.75 et je **TRANSPOSE** la count table
+
+```{r 4 , eval=TRUE}
+#Je calcul le cv par gène
+gene_mean <- apply(fa_filtre, 1, mean)
+gene_sd <- apply(fa_filtre, 1, sd)
+gene_cv <- gene_sd / gene_mean
+
+#Je filtre les genes avec un cv > 0.75
+fa_cv <- fa_expr_norm[gene_cv > 0.75, ]
+dim(fa_cv)
+
+######TRANSPOSER LA COUNT TABLE#######
+fa_cv <- t(fa_cv)
+
+```
+
+```{r 5 pressure , eval=TRUE}
+gsg = goodSamplesGenes(fa_cv, verbose = 3);
+gsg$allOK
+```
+
+## Arbre permettant de détecter les valeurs abérrantes
+
+```{r 6 pressure,fig.width=20,fig.height=20 , eval=TRUE}
+sampleTree = hclust(dist(fa_cv), method = "average");
+# Plot the sample tree: Open a graphic output window of size 12 by 10 inches
+# The user should change the dimensions if the window is too large or too small.
+options(repr.plot.width = 12, repr.plot.height = 10)
+plot(sampleTree, main = "Sample clustering to detect outliers", sub="", xlab="",
+     cex.lab = 1.2, cex.axis = 1.5, cex.main = 2)
+# Plot a line to show the cut
+abline(h = 3000000, col = "red");
+```
+On va couper le cluster pour retirer l'echantillon aberrant
+
+```{r 7 pressure , eval=TRUE}
+# Determine cluster under the line
+clust = cutreeStatic(sampleTree, cutHeight = 3000000, minSize = 10)
+table(clust)
+```
+
+```{r 8 pressure , eval=TRUE}
+
+# clust 1 contains the samples we want to keep.
+keepSamples = (clust==1)
+datExpr = fa_cv[keepSamples, ]
+nGenes = ncol(datExpr)
+nSamples = nrow(datExpr)
+#head(datExpr)
+#class(datExpr)
+datExpr <- as.data.frame(datExpr)
+#head(datExpr)
+# datExpr_view <- datExpr[,1:10]
+# datExpr_view
+```
+
+## Import trait table
+
+Liaison échantillons et mesures de phénotype avec la table "trait" (analyse binaire)
+
+```{r 9 pressure, eval=TRUE}
+# Re-cluster samples
+sampleTree2 = hclust(dist(datExpr), method = "average")
+# Convert traits to a color representation: white means low, red means high, grey means missing entry
+traitColors = numbers2colors(fa_trait, signed = FALSE);
+# Plot the sample dendrogram and the colors underneath.
+options(repr.plot.width = 15, repr.plot.height = 12)
+plotDendroAndColors(sampleTree2, traitColors,
+                    groupLabels = names(fa_trait),
+                    main = "Sample dendrogram and trait heatmap")
+```
+```{r 10 pressure, echo=FALSE, eval=TRUE}
+save(datExpr, fa_trait, file = "fa-dataInput.RData")
+```
+
+```{r 11 pressure, eval=TRUE}
+# Allow multi-threading within WGCNA. This helps speed up certain calculations.
+# At present this call is necessary for the code to work.
+# Any error here may be ignored but you may want to update WGCNA if you see one.
+# See note above.
+allowWGCNAThreads()
+# Load the data saved in the first part
+lnames = load(file = "fa-dataInput.RData");
+#The variable lnames contains the names of loaded variables.
+lnames
+```
+
+Détection des modules et construction du réseau WGCNA
+
+```{r 12 pressure, eval=TRUE}
+# Choose a set of soft-thresholding powers
+powers = c(c(1:10), seq(from = 12, to = 20, by = 2)) #on prend de 12 à 20, 2 en 2
+# Call the network topology analysis function
+sft = pickSoftThreshold(datExpr, powerVector = powers, verbose = 5) 
+# Plot the results:
+par(mfrow = c(1, 2));
+options(repr.plot.width = 14, repr.plot.height = 10);
+# Scale-free topology fit index as a function of the soft-thresholding power
+plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     xlab = "Soft Threshold (power)", ylab = "Scale Free Topology Model Fit,signed R^2", type = "n",
+     main = paste("Scale independence"));
+text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     labels = powers, cex = 0.9, col = "red");
+# this line corresponds to using an R^2 cut-off of h
+abline(h = 0.90, col = "red")
+# Mean connectivity as a function of the soft-thresholding power
+plot(sft$fitIndices[,1], sft$fitIndices[,5],
+     xlab = "Soft Threshold (power)", ylab = "Mean Connectivity", type = "n",
+     main = paste("Mean connectivity"))
+text(sft$fitIndices[,1], sft$fitIndices[,5], labels = powers, cex = 0.9, col = "red")
+```
+
+On voit qu'à partir de puissance 7 on atteint le seuil donc pas besoin d'aller jusqu'à puissance 20
+on va mettre matrice de corrélation à la puissance 8 
+
+Graph 2: quand on augmete la puissance on perd des corrélations
+
+## Adjacency matrix
+
+Ci dessous, je choisis 8 comme puissance la plus basse qui construit la scale free topology. Ensuite, la fonction de génere des modules de taille 30, et fusionne les modules similaires à plus de 25% et enregistre la matrice de chevauchement topologique dans un objet.
+
+```{r 13 pressure, eval=TRUE}
+#coupe le jeu de données en differents blocks pour eviter methode de calculation plus lourde
+net = blockwiseModules(datExpr, power = 8,
+                       TOMType = "signed", minModuleSize = 30,
+                       reassignThreshold = 0.5, mergeCutHeight = 0.25,
+                       numericLabels = TRUE, pamRespectsDendro = FALSE,
+                       saveTOMs = TRUE, nThreads = 8,
+                       saveTOMFileBase = "fa_TOM",
+                       verbose = 3)
+```
+
+Nombre et taille des modules
+
+```{r 14BIS, eval=TRUE}
+table(net$colors)
+
+```
+
+Il y a **26 modules**
+
+## Cluster Dendrogram
+
+Ci-dessous la représentation des modules et du clustering des gènes
+
+```{r 15 pressure, eval=TRUE}
+# Convert labels to colors for plotting
+mergedColors = labels2colors(net$colors)
+#mergedColors
+
+# Plot the dendrogram and the module colors underneath
+plotDendroAndColors(net$dendrograms[[1]], mergedColors[net$blockGenes[[1]]],
+                    "Module colors",
+                    dendroLabels = FALSE, hang = 0.03,
+                    addGuide = TRUE, guideHang = 0.05)
+```
+
+Sauvegarde des résultats en .RData
+
+```{r 16 pressure, eval=TRUE}
+#on transforme en couleurs
+
+moduleLabels = net$colors
+moduleColors = labels2colors(net$colors)
+MEs = net$MEs;
+head(MEs)
+geneTree = net$dendrograms[[1]];
+save(MEs, moduleLabels, moduleColors, geneTree,
+     file = "Transcriptomique-networkConstruction-auto.RData")
+```
+
+```{r 17bis, eval=TRUE}
+lnames = load(file = "fa-dataInput.RData");
+#The variable lnames contains the names of loaded variables.
+lnames
+# Load network data saved in the second part.
+lnames = load(file = "Transcriptomique-networkConstruction-auto.RData");
+lnames
+
+```
+
+Quantification des associations module-trait
+
+Les modules qui sont significativement associés aux traits cliniques sont mesurés. Nous avons déjà un profil de synthèse calculé (eigengene) pour chaque module, donc nous corrélons simplement les eigengènes avec des traits phénotypiques et recherchons les associations les plus significatives: 
+
+```{r 18 pressure, eval=TRUE}
+
+# Define numbers of genes and samples
+nGenes = ncol(datExpr);
+nSamples = nrow(datExpr);
+# Recalculate MEs with color labels
+MEs0 = moduleEigengenes(datExpr, moduleColors)$eigengenes
+MEs = orderMEs(MEs0)
+moduleTraitCor = cor(MEs, fa_trait, use = "p");
+moduleTraitPvalue = corPvalueStudent(moduleTraitCor, nSamples);
+```
+
+## Heatmap relation module/trait
+
+Représentation de chaque module eigengene et son coefficient de corrélation.
+
+```{r 19 pressure,fig.width=10,fig.height=10, eval=TRUE }
+# Will display correlations and their p-values
+textMatrix =  paste(signif(moduleTraitCor, 2), "\n(",
+                           signif(moduleTraitPvalue, 1), ")", sep = "");
+dim(textMatrix) = dim(moduleTraitCor)
+par(mar = c(6, 8, 1, 1));
+# Display the correlation values within a heatmap plot
+labeledHeatmap(Matrix = moduleTraitCor,
+               xLabels = names(fa_trait),
+               yLabels = names(MEs),
+               ySymbols = names(MEs),
+               colorLabels = FALSE,
+               colors = blueWhiteRed(50),
+               textMatrix = textMatrix,
+               setStdMargins = FALSE,
+               cex.text = 0.5,
+               zlim = c(-1,1),
+               main = paste("Module-trait relationships"))
+
+```
+Correlation entre la matrice de eigengene MEs et la matrice de datTraits
+On peut voir les fortes correlations rouge foncé ou bleu foncé 
+
+
+## Eigengene view
+
+```{r dendrogram, eval=TRUE}
+plotEigengeneNetworks(MEs, "Eigengene dendrogram", marDendro = c(0,4,2,0),plotHeatmaps = FALSE)
+```
+Heatmap matrix
+
+```{r heatmap adjacency, eval=TRUE}
+# Plot the heatmap matrix (note: this plot will overwrite the dendrogram plot)
+par(cex = 1.0)
+plotEigengeneNetworks(MEs, "Eigengene adjacency heatmap", marHeatmap = c(3,4,2,2),plotDendrograms = FALSE, xLabelsAngle = 90)
+```
+
+Visualize, analyze the network and superimpose the proteomics data on it.
+
+Colorez dans le réseau choisi les noeuds en fonction des données de protéomiques avec un gradient de couleur correspondant au fold-change des données de protéomique.
+
+## Export Cytoscape
+
+```{r}
+# Recalculate topological overlap if needed
+TOM=TOMsimilarityFromExpr(datExpr, power=8)
+# Read in the annotation file
+#annot=read.csv(file="data/GeneAnnotation.csv")
+# Select modules
+modules=c("darkgrey","grey")
+# Select module probes
+probes=colnames(datExpr)
+inModule=is.finite(match(moduleColors, modules))
+modProbes=probes[inModule]
+#modGenes=annot$gene_symbol[match(modProbes, annot$substanceBXH)]
+# Select the corresponding Topological Overlap
+modTOM=TOM[inModule, inModule]
+dimnames(modTOM)=list(modProbes, modProbes)
+# Export the network into edge and node list files Cytoscape can read
+cyt=exportNetworkToCytoscape(modTOM,
+                        edgeFile=paste("CytoscapeInput-edges-",paste(modules, collapse="-"),".txt", sep=""),
+                        nodeFile=paste("CytoscapeInput-nodes-",paste(modules, collapse="-"),".txt", sep=""),
+                        weighted=TRUE,
+                        threshold=0.5,
+                        nodeNames=modProbes)
+                        #altNodeName
+
+```
+
+<div class="alert alert-danger" role="alert">Je ne comprends pas pourquoi mes exports nodes et edges sont vides donc pas possible de passer à Cytoscape</div>
+
+## Remise du rapport
+
+Vous fournirez un rapport au format pdf généré à partir d’un Rmd (déposez-nous impérativement les 2 fichiers, Rmd et pdf, avec comme nom de fichier “NOM-PRENOM_evaluation-m6-2021” + .Rmd ou .pdf dans le dossier /shared/projects/dubii2021/<login>/m6-bioinfo-integr/mini-projet/)
+
+
+## Session info
+
+```{r session_info, eval=TRUE}
+#### Session info ####
+sessionInfo()
+
+```
